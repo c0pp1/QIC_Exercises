@@ -1,0 +1,6 @@
+#IGNORE ALL
+*
+#UNIGNORE SOURCE FILES
+!*.f90
+!.gitignore
+!*.md
