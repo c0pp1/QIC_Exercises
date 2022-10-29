@@ -4,3 +4,5 @@
 !*.f90
 !.gitignore
 !*.md
+!Makefile
+!*/
