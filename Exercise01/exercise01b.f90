@@ -16,7 +16,8 @@ program precision
     real*8, parameter :: PI8 = 4*DATAN(1.d0)*10._8**32
     !b)
     character(len=36), parameter :: table1_format = '(T15A, T20A, /A, I8, I8, /A, I8, I8)'
-    character(len=75), parameter :: table2_format = '(T18A, TR10A, TR2A, /A, E21.13, E21.13, E21.13, /A, E21.13, E21.13, E21.13)'
+    character(len=81), parameter :: table2_format = '(T18A, TR10A, TR2A, /A, ES21.13, ES21.13, ES21.13, &
+                                                    &/A, ES21.13, ES21.13, ES21.13)'
 
     !print quite nice output, showing differences between results and initial values
     write (*,'(A)')  "INTEGER precision"
