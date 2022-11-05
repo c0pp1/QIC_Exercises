@@ -1,6 +1,6 @@
 compiler=gfortran
 
-all: exercise02ab, exercise02c
+all: exercise02ab exercise02c
 	@echo "Done!"
 
 exercise02ab: advanced_ops.f90 checkpoint_mod.f90 exercise02ab.f90
@@ -11,6 +11,6 @@ exercise02c: exercise02c.f90
 
 clean:
 	@echo "Cleaning up..."
-	@rm -f exercise01ab exercise01b exercise01c
+	@rm -f exercise02ab exercise02c
 
 .PHONY: all clean
