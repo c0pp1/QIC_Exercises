@@ -1,3 +1,13 @@
+!> define new type complex matrix
+!!
+!! define also the main operations to handle complex matrix calculations.
+!! Two types of initialization are proposed: Init_size initializes only the 
+!! size of the matrix end set the elemnts to zero, Init_elems take care of
+!! initializing all the variables of the cmatrix type, including trace and 
+!! ajugate if possible.
+!! Base operations provided are .Adj. to calculate the adjoint and .Tr. to
+!! calculate the trace
+!!
 module complex_matrix
     use checkpoint_mod
 
@@ -6,16 +16,6 @@ module complex_matrix
     logical, private :: debug = .True.  !< private logical variable to enable debugging within this module
     private          :: Trace, MatAdjoint, Init_elems, Init_size
 
-    !< define new type complex matrix
-    !!
-    !! define also the main operations to handle complex matrix calculations.
-    !! Two types of initialization are proposed: Init_size initializes only the 
-    !! size of the matrix end set the elemnts to zero, Init_elems take care of
-    !! initializing all the variables of the cmatrix type, including trace and 
-    !! ajugate if possible.
-    !! Base operations provaded are .Adj. to calculate the adjoint and .Tr. to
-    !! calculate the trace
-    !!
     type :: cmatrix
         double complex, allocatable :: elems(:, :)      !< elements of the matrix
         integer, dimension(2)       :: MN = (/0,0/)     !< size of matrix
@@ -135,6 +135,11 @@ module complex_matrix
         !! takes matrix elements and returns matrix element without
         !! selected lines and rows
         !!
+        !! @param[in]   matrix_elems    elements of the matrix, 2 dimensional double complex array
+        !! @param[in]   i, j            positive integers (>=1) indicating row and column to cut off, 
+        !!                              must be lesser than matrix dims
+        !! @return      sl_elems        elements of sliced matrix with dims (m-1, n-1)
+        !!
         function slice(matrix_elems, i, j) result(sl_elems)
             double complex, intent(in)  :: matrix_elems(:, :)
             integer, intent(in)         :: i, j
@@ -144,6 +149,11 @@ module complex_matrix
 
             mm = ubound(matrix_elems, 1)
             nn = ubound(matrix_elems, 2)
+            if ( i < 1 .or. j < 1 .or. i > mm .or. j > nn ) then
+                print *, "Error: row or column index are outside matrix dimensions"
+                return
+            end if
+
             allocate(mask(mm, nn))
             allocate(sl_elems(mm-1, nn-1))
 
@@ -161,6 +171,10 @@ module complex_matrix
         !! due to IO limits cannot call this function directly in
         !! a IO operation; declare a variable to store its result 
         !! and use the variable for IO operations instead.
+        !!
+        !! @param[in]   matrix_elems    elements of the matrix, 2 dimensional double complex array
+        !! @return      det             double complex containing the result. If not calculable 
+        !!                              gives random small number
         !!
         recursive function Determinant(matrix_elems) result(det)
             double complex, intent(in) :: matrix_elems(:, :)
@@ -186,6 +200,10 @@ module complex_matrix
         !! due to IO limits cannot call this function directly in
         !! a IO operation; declare a variable to store its result 
         !! and use the variable for IO operations instead
+        !!
+        !! @param[in]   matrix_elems    elements of the matrix, 2 dimensional double complex array
+        !! @param[in]   MN              2 dimensional array containing the dimension of the matrix
+        !! @return      cofact          cofactor matrix elements with same dims as input matrix
         !!
         function Cofactor(matrix_elems, MN) result(cofact)
             double complex, intent(in)  :: matrix_elems(:, :)
@@ -214,6 +232,7 @@ module complex_matrix
             type(cmatrix) :: adjoint
 
             call Init(adjoint, matrix%MN)
+            ! the adjoint is the transpose of the cofactor matrix
             adjoint%elems = transpose(Cofactor(matrix%elems, matrix%MN))
         end function MatAdjoint
 

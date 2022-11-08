@@ -32,10 +32,11 @@ module advanced_ops
     !! if the lengths are different returns zero, printing an error
     !!
     !! @param[in]   A, B    the two arrays
-    !! @param   dimA    the length of A array
-    !! @param   dimB    the length of B array
-    !! @param   ii      integer for loop over array length
-    !! @result  C       resulting scalar
+    !! @param   dimA        the length of A array
+    !! @param   dimB        the length of B array
+    !! @param   ii          integer for loop over array length
+    !! @result  C           resulting scalar
+    !!
     function arrmul(A, B) result(C)
         real*8, intent(in) :: A(:)
         real*8, intent(in) :: B(:)
@@ -147,7 +148,7 @@ module advanced_ops
     !! takes in input the matrix you want to print and gives the format string
     !! to have a nice output. Numbers are printed in scientific representation
     !!
-    !! @param[in]   A   the matrix to be printed, shape length 2
+    !! @param[in]   A       the real*8 matrix to be printed, shape length 2
     !! @return      mformat the string with the format
     function matrixformatter(A) result(mformat)
         real*8, intent(in) :: A(:, :)
