@@ -1,3 +1,4 @@
+# modify this variable to use your preferred compiler
 compiler=gfortran
 
 all: exercise02ab exercise02c
