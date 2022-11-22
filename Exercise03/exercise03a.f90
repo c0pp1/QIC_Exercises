@@ -13,7 +13,7 @@ program matrix_mul_perf
     logical           :: skip_next = .false.
 
     !> read command line arguments
-
+    !!
     do ii = 1, command_argument_count()
         if (skip_next) then
             skip_next = .false.
@@ -84,6 +84,9 @@ program matrix_mul_perf
     end do
     write (*, *)
 
+    !> write results to file
+    !! each row represents a different method
+    !!
     write (format, '(A, I2, A)') "(A, I", floor(log10(real(m)))+1, ", A)'"
     write (ofname, format) trim(ofdir), m, ".txt"
     open(unit = outunit, file=trim(ofname), action='write')
@@ -96,7 +99,7 @@ program matrix_mul_perf
     contains
 
         subroutine print_help()
-            print *, "you called print help"
+            print *, "Usage: ./exercise03a -m [matrix size] -n [iterations] -o [output dir/first part of filename]"
         end subroutine
 
 end program

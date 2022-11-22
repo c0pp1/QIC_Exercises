@@ -1,27 +1,16 @@
 program main
 
-    external zheev
+    use lapack_wrapper
 
-    integer*4 :: m, NN, ii, info, outunit = 100, lwork = -1, seed(4) = (/1,1,1,1/)
-    double complex, allocatable :: A(:, :), work(:), D(:)
-    double precision, allocatable :: eigenvals(:), spacings(:), rwork(:)
+    integer*4 :: m, NN, ii, info, outunit = 100
+    double complex, allocatable :: A(:, :)
+    double precision, allocatable :: rA(:, :)
+    double precision, allocatable :: eigenvals(:), spacings(:)
     character(len=200) :: ofdir, ofname
-    character*1 :: creturn = achar(13), jobz = 'N', uplo = 'U'
+    character*1 :: creturn = achar(13)
     character(len=32) :: arg, format
-    logical           :: skip_next = .false., debug = .false.
+    logical           :: skip_next = .false., neglect_1eig = .false., debug = .false., realA = .false.
 
-    integer :: MODE = 6
-    double precision :: COND = 1.1d0
-    complex*16 :: DMAX
-    character :: RSIGN
-    character :: GRADE = 'N'
-    complex*16, allocatable :: DL(:)
-    character :: PIVTNG = 'N'
-    integer, allocatable :: IPIVOT(:)
-    double precision :: SPARSE = 0.
-    double precision :: ANORM = -1.
-    character :: PACK = 'N'
-    integer, allocatable :: IWORK(:)
 
     !> read command line arguments
     !!
@@ -38,10 +27,16 @@ program main
                 read (arg, *) m
                 skip_next = .true.
                 
-            case ('-n', '--iter')
+            case ('-i', '--iter')
                 call get_command_argument(ii+1, arg)
                 read (arg, *) NN
                 skip_next = .true.
+
+            case ('-n', '--neglect1')
+                neglect_1eig = .true.
+
+            case ('-r', '--real')
+                realA = .true.
                 
             case ('-o', '--odirname')
                 call get_command_argument(ii+1, arg)
@@ -62,18 +57,27 @@ program main
     end do
 
     !> allocate matrix and related arrays
-    allocate( A(m, m), work(1), eigenvals(m), spacings(m-1), D(m), DL(m), IWORK(m), rwork(max(1, 3*m-2)))
+    allocate(eigenvals(m), spacings(merge(m-2, m-1, neglect_1eig)))
+    if(realA) then
+        allocate(rA(m, m))
+    else 
+        allocate(A(m, m))
+    end if
 
     !> open output file
     write (format, '(A, I2, A)') "(A, I", floor(log10(real(m)))+1, ", A)'"
-    write (ofname, format) trim(ofdir), m, ".txt"
+    write (ofname, format) trim(ofdir), m, trim(merge("r.txt", ".txt ", realA))
     open(unit = outunit, file=trim(ofname), action='write')
 
     !> do calculations
     do ii=1, NN
         ! generate random hermitian matrix
-        call zlatmr(m, m, 'U', seed, 'H', D, MODE, COND, DMAX, RSIGN, GRADE, D, MODE, COND, D, &
-                    MODE, COND, PIVTNG, IPIVOT, m, m, SPARSE, ANORM, PACK, A, m, IWORK, info)
+        if(realA) then
+            call latmr_wrap(A=rA, SYM='S', INFO=info)
+        else
+            call latmr_wrap(A=A, SYM='H', INFO=info)
+        end if
+        if(debug) print *, "done"
         if(info /= 0) then
             print *, "ERROR: failed to generate #", ii, " random hermitian matrix, skipping..."
             cycle
@@ -81,22 +85,24 @@ program main
 
         if(debug) print *, A
 
-        !> diagonalize and get eigenvalues
-        !! the first call determines the optimal value for lwork 
-        !! and stores it in work(1). Then we call again the subroutine
-        !! with lwork optimal value
-        !!
-        call zheev(jobz, uplo, m, A, m, eigenvals, work, lwork, rwork, info)
-        lwork = int(work(1))
-        deallocate(work)
-        allocate(work(lwork))
-        call zheev(jobz, uplo, m, A, m, eigenvals, work, lwork, rwork, info)
+        ! diagonalize and get eigenvalues
+        if(realA) then
+            call ev_wrap( A=rA, W=eigenvals, INFO=info)
+        else
+            call ev_wrap( A=A, W=eigenvals, INFO=info)
+        end if
         if(info /= 0) then
             print *, "ERROR: failed to get eigenvalues for matrix ", ii, " skipping..."
             cycle
         end if
 
-        spacings = (eigenvals(2:) - eigenvals(:-1))/ merge((sum(eigenvals)/max(1,m)), 1.d0, (sum(eigenvals)/max(1,m))/=0.)
+        if(neglect_1eig) then
+            spacings = (eigenvals(3:) - eigenvals(2:m-1))
+            spacings = spacings / (sum(spacings)/max(1,m-2))
+        else
+            spacings = (eigenvals(2:) - eigenvals(:-1))
+            spacings = spacings / (sum(spacings)/max(1,m-1))
+        end if
         write(outunit, *) spacings
 
         write (*, '(A, A, F6.2, A)', advance='no') creturn, "Spacings calculations, ", ii*100./NN, "% done."
@@ -106,7 +112,8 @@ program main
     contains
 
         subroutine print_help()
-            print *, "Usage: ./exercise03a -m [matrix size] -n [iterations] -o [output dir/first part of filename]"
+            print *, "Usage: ./exercise03b -m [matrix size] -i [iterations]" // &
+                     "-n [optional to neglect first eigenval] -o [output dir/first part of filename]"
         end subroutine
 
 end program
