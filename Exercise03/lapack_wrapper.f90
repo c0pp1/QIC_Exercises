@@ -1,11 +1,16 @@
 module lapack_wrapper
 
+    !> simple lapack wrapper to avoid specifying useless variables
+    !!
+
     implicit none
     !> declare default values for arguments of lapack routines
+    ! generative routines
     integer, parameter :: D_MODE = 6, D_SEED(4) = (/1,1,1,1/)
     character, parameter :: D_DIST = 'S', D_RSIGN = 'F', D_GRADE = 'N', D_PIVTNG = 'N', D_PACK = 'N'
     double precision, parameter :: D_COND = 1.1d0, D_SPARSE = 0., D_ANORM = -1.
 
+    ! eigenvalues routines
     integer, parameter :: D_LWORK = -1
     character, parameter :: D_JOBZ = 'N', D_UPLO = 'U'
 
@@ -134,7 +139,7 @@ module lapack_wrapper
             integer, optional, dimension(:) :: IWORK
             integer :: INFO 
 
-            !> declare non optional variables to be passed to zlatmr in place of optional variables
+            !> declare non optional variables to be passed to dlatmr in place of optional variables
             integer :: noM, noN, noISEED(4), noMODE, noMODEL, noMODER, noKU, noKL, noLDA
             character :: noDIST, noRSIGN, noGRADE, noPIVTNG, noPACK
             double precision, dimension(min(ubound(A, 1), ubound(A, 2))) :: noD, noDL, noDR

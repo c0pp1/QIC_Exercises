@@ -96,6 +96,7 @@ program main
             cycle
         end if
 
+        ! get normalized spacings
         if(neglect_1eig) then
             spacings = (eigenvals(3:) - eigenvals(2:m-1))
             spacings = spacings / (sum(spacings)/max(1,m-2))
