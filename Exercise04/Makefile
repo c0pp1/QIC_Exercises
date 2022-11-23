@@ -10,17 +10,14 @@ libsdir=/usr/lib
 libs=-llapack -lblas -ltmglib
 endif
 
-all: exercise03a exercise03b
+all: exercise04
 	@echo "Done!"
 
-exercise03a: advanced_ops.f90 exercise03a.f90
-	@${compiler} advanced_ops.f90 exercise03a.f90 -o exercise03a
-
-exercise03b: exercise03b.f90 lapack_wrapper.f90
-	@${compiler} -L${libsdir} lapack_wrapper.f90 exercise03b.f90 -o exercise03b ${libs}
+exercise04: exercise04.f90 lapack_wrapper.f90
+	@${compiler} -L${libsdir} lapack_wrapper.f90 exercise04.f90 -o exercise04 ${libs}
 
 clean:
 	@echo "Cleaning up..."
-	@rm -f exercise03a exercise03b
+	@rm -f exercise04
 
 .PHONY: all clean
