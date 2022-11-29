@@ -3,12 +3,6 @@
 !! a one dimensional harmonic oscillator
 !!  H = p**2 + w**2*q**2
 !!
-!! with "--precision" you can set the relative precision of the output
-!! eigenvalues. The relation between precision and the number of points
-!! used in discretization k has been deduced through graphical results
-!! studying the case k = k_user.
-!! N.B. this relation is valid only if precision < 3%
-!!
 program main
     use lapack_wrapper
 
@@ -20,6 +14,7 @@ program main
     logical :: skip_next = .false.
     character(len=32) :: arg, ofdir = './exercise04'
 
+    ! read command line arguments
     do ii = 1, command_argument_count()
         if (skip_next) then
             skip_next = .false.
@@ -66,12 +61,12 @@ program main
         end select
     end do
 
-    ! this relation guarantees the precision the user wants
+
     k = ceiling(real(k_user, kind=8) / (10._8*precision))
 
     ! allocate memory for discretized space, hamiltonian, and eigenvalues
     allocate(x(k), H(k, k), eigenvals(k))
-    dx = abs(xlims(2)-xlims(1))/real(k-1)
+    dx = abs(xlims(2)-xlims(1))/real(k-1, kind=8)
     x = (/(minval(xlims)+ii*dx, ii=0,k-1, 1)/)
 
     call get_Hamiltonian(H, w, x, dx)
@@ -111,8 +106,8 @@ program main
 
             do ii=1, m
                 do jj = 1, n
-                    if(ii==jj) A(ii, jj) = 1./dx**2 + potential(x(ii), w)/2
-                    if((ii==jj+1) .or. (ii==jj-1)) A(ii, jj) = -0.5/dx**2
+                    if(ii==jj) A(ii, jj) = 2._8/dx**2 + potential(x(ii), w)
+                    if((ii==jj+1) .or. (ii==jj-1)) A(ii, jj) = -1._8/dx**2
                 end do
             end do
 
