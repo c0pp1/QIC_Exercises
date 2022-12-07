@@ -5,7 +5,7 @@ program main
 
     type(cmatrix)         :: matrix
     type(cmatrix)         :: adjoint
-    integer, dimension(2) :: dims = (/1,2/), dims2 = (/3,3/)
+    integer, dimension(2) :: dims = (/1,2/), dims2 = (/4,3/)
     integer               :: counter1, unit = 100
     double complex, allocatable :: elems(:, :)
     logical               :: debug = .True.
@@ -38,7 +38,7 @@ program main
 
     write (*, *) "Trace from new data structure: ", matrix%tr
     print *, "Trace from operator: ", tr
-    write (*, *) "Determinant: ", det    
+    write (*, *) "Determinant: ", det
 
     write (*, *) "Adjugate matrix from new data structure:"
     do counter1 = 1, ubound(elems, 1)

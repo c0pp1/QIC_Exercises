@@ -62,7 +62,7 @@ program main
     end do
 
 
-    k = ceiling(real(k_user, kind=8) / (4._8*precision))
+    k = ceiling(real(k_user, kind=8) / (10._8*precision))
 
     ! allocate memory for discretized space, hamiltonian, and eigenvalues
     allocate(x(k), H(k, k), eigenvals(k))
@@ -70,7 +70,7 @@ program main
     !print *, dx
     x = (/(minval(xlims)+ii*dx, ii=0,k-1, 1)/)
     !print *, x
-    call get_Hamiltonian(H, w, x, dx)
+    call get_Hamiltonian(H, w, x, k_user)
     !print *, H
     ! JOBZ='V' gives the eigenstates as columns in the input matrix
     call ev_wrap(JOBZ='V', A=H, W=eigenvals, INFO=info)
@@ -79,8 +79,8 @@ program main
         stop
     end if
 
-    open(unit=outunit, file=trim(ofdir) // '.txt', action='write')
-    do ii=1, k_user
+    open(unit=outunit, file=trim(ofdir) // '_new.txt', action='write')
+    do ii=1, k
         write(outunit, *) H(ii, :k_user)
     end do
     write(outunit, *) eigenvals(:k_user)
@@ -92,9 +92,11 @@ program main
             print *, "Usage: ./exercise04 -k [#eigen to calculate] -x [xlims, comma separated without blank spaces] -w [frequency]"
         end subroutine print_help
 
-        subroutine get_Hamiltonian(A, wi, xi, dxi)
+        subroutine get_Hamiltonian(A, w, x, k_user)
             double precision, intent(inout) :: A(:, :)
-            double precision, intent(in) :: wi, xi(:), dxi
+            double precision, intent(in) :: w, x(:)
+            double precision :: dx
+            integer, intent(in) :: k_user
             integer :: m, n, ij, jj
 
             m = ubound(A, 1)
@@ -104,26 +106,26 @@ program main
                 stop
             end if
             A = 0._8
-
+            dx = (x(m) - x(1))/real(m-1, 8)
             
             do jj = 1, n
                 do ij=1, m
-                    if(ij==jj) A(ij, jj) = 2._8/(dxi*dxi) + potential(xi(ij), wi)
-                    if((ij==jj+1) .or. (ij==jj-1)) A(ij, jj) = -1._8/(dxi*dxi)
+                    if(ij==jj) A(ij, jj) = 2._8/(k_user*dx**2) + potential(x(ij), w)*k_user
+                    if((ij==jj+1) .or. (ij==jj-1)) A(ij, jj) = -1._8/(k_user*dx**2)
                 end do
             end do
-
+            !A = A / dx
         end subroutine get_Hamiltonian
 
-        function potential(xj, w_user) result(V)
-            double precision :: xj
+        function potential(x, w_user) result(V)
+            double precision, intent(in) :: x
             double precision, intent(in), optional  :: w_user
             double precision :: V
-            double precision :: wj = 1._8
+            double precision :: w = 1._8
 
-            if(present(w_user)) wj = w_user
+            if(present(w_user)) w = w_user
             
-            V = wj**2*xj**2
+            V = w**2*x**2
 
         end function potential
 
