@@ -98,29 +98,31 @@ module trotter_suzuki
 
     end subroutine
     
-    function potential_t(x, step, dt, w_user) result(V)
-        double precision, intent(in) :: x(:), dt
+    function potential_t(x, step, times, w_user) result(V)
+        double precision, intent(in) :: x(:), times(:)
         double precision, intent(in), optional  :: w_user
         double precision :: w = 1._8, V(ubound(x, 1))
         integer, intent(in) :: step
 
         if(present(w_user)) w = w_user
         
-        V = w**2*(x-step*dt)**2
+        V = w**2*(x-times(step)/times(ubound(times, 1)))**2
+        !call checkpoint(5, "x-t/T at step:", scalar=real(step, 8), vector=x-times(step)/times(ubound(times, 1)))
+        !V = w**2*(x-2)**2
 
     end function
 
-    subroutine propagate_step(plan_f, plan_b, dt, i, state, state_fft, x, p)
-        intent(in) :: i, dt, p, x, state, plan_f, plan_b
+    subroutine propagate_step(plan_f, plan_b, times, dt, i, state, state_fft, x, p)
+        intent(in) :: i, times, dt, p, x, state, plan_f, plan_b
         intent(inout) :: state_fft
-        double precision :: dt, p(:), x(:)
+        double precision :: times(:), dt, p(:), x(:)
         double complex :: state_fft(:), state(:)
         !pointer :: state_fft
         integer :: i, k
         integer*8 :: plan_f, plan_b
 
         call checkpoint(5, 'applying first V/2')
-        state_fft = cdexp(cmplx(0., -1, kind=8)*0.5*dt*potential_t(x, i, dt))*state
+        state_fft = cdexp(cmplx(0., -1, kind=8)*0.5*dt*potential_t(x, i, times))*state
 
         call checkpoint(5, 'applying FFT')
         call dfftw_execute_dft(plan_f, state_fft, state_fft)
@@ -131,7 +133,7 @@ module trotter_suzuki
         call checkpoint(5, 'applying reverse FFT')
         call dfftw_execute_dft(plan_b, state_fft, state_fft)
         call checkpoint(5, 'applying last V/2')
-        state_fft = cdexp(cmplx(0., -1, kind=8)*0.5*dt*potential_t(x, i, dt))*state_fft
+        state_fft = cdexp(cmplx(0., -1, kind=8)*0.5*dt*potential_t(x, i, times))*state_fft
 
         ! renormalize
         state_fft = state_fft / k
@@ -172,15 +174,13 @@ program main
 
     integer :: ii, mx=50, nt=50, info, outunit=100, E=1
     integer*8 :: plan_f, plan_b, recl
-    double precision, allocatable :: H0(:, :), eigenvals(:), p(:), x(:)
+    double precision, allocatable :: H0(:, :), eigenvals(:), p(:), x(:), times(:)
     double precision :: xlims(2) = (/-1._8,1._8/), w = 1._8, T = 1., dt
     double complex, allocatable :: state_in(:), state_fft(:)
-    double complex, pointer :: state_fft_p(:)
-    target :: state_fft
     logical :: skip_next = .false.
-    character(len=64) :: arg, ofdir = './exercise05/'
+    character(len=64) :: arg, ofdir = './exercise05'
 
-    DB = 2
+    DB = 5
 
     ! read command line arguments
     do ii = 1, command_argument_count()
@@ -242,26 +242,29 @@ program main
 
 
     ! get the ground state of the harmonic oscillator
-    call checkpoint(3, 'Getting ground state...')
+    call checkpoint(3, 'Getting initial state...')
     call get_groundstate(H0, w, mx, eigenvals, xlims, x, info, p)
     if(info/=0) call checkpoint(1, 'Failed to get groundstate!')
-    call checkpoint(3, 'The requested eigenvalue is:', scalar=eigenvals(1))
+    call checkpoint(3, 'The requested eigenvalue is:', scalar=eigenvals(E))
     call checkpoint(4, 'Momentum discretization:', vector=p)
 
-    allocate(state_fft(mx), state_in(mx))
-    state_fft_p => state_fft
+    allocate(state_fft(mx), state_in(mx), times(nt))
 
     call fftw_plans(mx, plan_f, plan_b, state_fft)
     call checkpoint(3, "The plans are:", vector=real((/plan_f, plan_b/), kind=8))
 
     dt = T/(nt)
+    times = (/(ii*dt, ii=1,nt, 1)/)
     call checkpoint(3, 'The time step is:', scalar=dt)
+    call checkpoint(4, 'The times are:', vector=times)
 
     state_in = cmplx(H0(:, E), 0., kind=8)
     call checkpoint(4, 'Input to time propagation:', vector=real(state_in), &
                     scalar=real(sum(state_in*conjg(state_in))))
 
-    !call propagate_step(plan_f, plan_b, dt, 1, state_in, state_fft_p, x, p)
+    !> call propagate_step(plan_f, plan_b, dt, 1, state_in, state_fft_p, x, p)
+    !! this subroutine doesn't work, gives unpredictable results
+
     arg = '(A, I'
     write(arg, '(A, I1, A)') trim(arg), floor(log10(real(E)))+1, ', A)'
     write(ofdir, arg) trim(ofdir), E, '.dat'   
@@ -269,21 +272,22 @@ program main
     call checkpoint(3, 'Output file: ' // trim(ofdir))    
     open(unit=outunit, file=trim(ofdir), action='write', form='unformatted', access='direct', recl=recl)
     write(outunit, rec=1) abs(H0(:, 1))
-                
+        
+    ! propagate 
     do ii=1, nt
         call checkpoint(5, 'applying first V/2')
-        state_fft = cdexp(cmplx(0., -1, kind=8)*0.5*dt*potential_t(x, ii, dt))*state_in
-
+        state_fft = cdexp(cmplx(0., -0.5_8*dt*potential_t(x, ii, times), kind=8))*state_in
+        
         call checkpoint(5, 'applying FFT')
         call dfftw_execute_dft(plan_f, state_fft, state_fft)
-
+        call checkpoint(5, 'result', vector=abs(state_fft))
         call checkpoint(5, 'applying T')
         state_fft = cdexp(cmplx(0., -1, kind=8)*dt*p)*state_fft
 
         call checkpoint(5, 'applying reverse FFT')
         call dfftw_execute_dft(plan_b, state_fft, state_fft)
         call checkpoint(5, 'applying last V/2')
-        state_fft = cdexp(cmplx(0., -1, kind=8)*0.5*dt*potential_t(x, ii, dt))*state_fft
+        state_fft = cdexp(cmplx(0., -0.5_8*dt*potential_t(x, ii, times), kind=8))*state_fft
 
         ! renormalize
         state_fft = state_fft / mx
@@ -294,7 +298,7 @@ program main
 
     contains
     subroutine print_help()
-        print *, "Usage: ./exercise05 -m [#space steps (with prime factors 2,3,5,7,11 or 13)] -n [#time steps] " // &
+        print *, "Usage: ./exercise05 -m [#space steps (with prime factors 2,3,5,7)] -n [#time steps] " // &
                  "-x [xlims, comma separated without blank spaces] -t [time T] -w [frequency]"
     end subroutine print_help
 end program
