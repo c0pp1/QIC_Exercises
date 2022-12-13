@@ -1,4 +1,5 @@
 module checkpoint_mod
+    use complex_matrix_ops
     implicit none
     integer :: DB = 5
     character(1), parameter :: ESC = achar(27)
@@ -18,13 +19,15 @@ module checkpoint_mod
     !! @param[in]   string  optional string to be printed in a new line
     !! @param[in]   variable    optional real*4 variable to be printed in a new line
     !! @param       t   variable to store the system time at which the subroutine was called
-    subroutine checkpoint (debug_level, string, scalar, vector)
+    subroutine checkpoint (debug_level, string, scalar, vector, cmatrix)
 
-        integer, intent(in)                    :: debug_level     !< enable/disable debugging
-        character(len=*), intent(in), optional :: string    !< optional string
-        real*8, intent(in), optional           :: scalar, vector(:)  !< optional real*8 variable
+        integer, intent(in)                    :: debug_level       !< enable/disable debugging
+        character(len=*), intent(in), optional :: string            !< optional string
+        real*8, optional                       :: scalar, vector(:) !< optional real*8 variable
+        double complex, optional               :: cmatrix(:,:)
+        intent(in)                             :: scalar, vector, cmatrix
         character*10                           :: t         !< time
-        character(200)                         :: toprint
+        character(255)                         :: toprint
         if (debug_level <= DB) then
             call date_and_time(time=t)
             toprint = "[" // t(1:2) // ':' // t(3:4) // ':' // t(5:) // "]"
@@ -47,7 +50,10 @@ module checkpoint_mod
             end if  
             if (present(vector)) then
                 print *, vector
-            end if            
+            end if    
+            if (present(cmatrix)) then
+                write(*, '(' // matrixformatter(cmatrix) // ')') transpose(cmatrix)
+            end if         
         end if
 
     end subroutine
