@@ -136,4 +136,106 @@ module complex_matrix_ops
             
         end function
 
+        subroutine get_density_matrix(state, density_matrix)
+            double complex, allocatable :: density_matrix(:,:)
+            double complex :: state(:)
+            integer :: info=0, m
+            intent(in) :: state
+            intent(out) :: density_matrix
+
+            m = ubound(state, 1)
+            if(.not. allocated(density_matrix)) allocate(density_matrix(m, m), stat=info)
+            
+            density_matrix = spread(state, 2, m)* .Adj. spread(state, 2, m)
+
+        end subroutine
+
+
+        !> more general partial trace
+        !!
+        !! given the density matrix, a vector of zeros with ones on the indeces of the
+        !! subsystems to be traced out and the vector with dimensions of the subsystems,
+        !! calculate the partial trace
+        !!
+        !! @param[in]   density_matrix  the matrix on which to perform the partial trace
+        !! @param[in]   systems a vector of zeros with ones on the indexes of the subsystems to be traced out
+        !! @param[in]   dims    vector with dimensions of the subsystems
+        !! @param[out]  partial_dm  the partial density matrix
+        !!
+        subroutine partial_trace(density_matrix, systems, dims, partial_dm)
+            double complex :: density_matrix(:, :), partial_dm(:, :), trace_mat(:,:)
+            integer :: systems(:), dims(:), ii, m
+            allocatable :: partial_dm, trace_mat
+            intent(in) :: density_matrix, systems, dims
+            intent(out) :: partial_dm
+
+            m = product(pack(dims, systems==0))
+            if(allocated(partial_dm)) deallocate(partial_dm)
+            allocate(partial_dm(m, m))
+            partial_dm = cmplx(0._8, kind=8)
+            do ii=1, product(pack(dims, systems==1))
+        
+                trace_mat = cmplx(get_trace_matrix(systems, dims, ii), kind=8)
+                partial_dm = partial_dm + matmul(trace_mat, matmul(density_matrix, transpose(trace_mat)))
+        
+            end do
+            
+        end subroutine
+
+        !> get the matrix to trace out the el-th state
+        !!
+        !! given the subsystems to trace out and the dimensions of all subsystems,
+        !! computes the matrix for tracing out the el-th state, where el indicates
+        !! the state among the possible state of a system built on the subsystems
+        !! to trace out.
+        !!
+        !! @param[in]   systems a vector of zeros with ones on the indexes of the subsystems to be traced out
+        !! @param[in]   dims    vector with dimensions of the subsystems
+        !! @param[in]   el  the index of state to be traced out
+        !! @return      tr_mat  the matrix to perform the trace
+        !!
+        function get_trace_matrix(systems, dims, el) result(tr_mat)
+            integer, intent(in) :: systems(:), dims(:), el
+            integer, allocatable :: tr_mat(:,:), identity(:), tmp(:,:), tmp_sys(:,:)
+            integer :: ii
+            logical :: mask(ubound(dims, 1))
+
+            ! initialize tr_matrix
+            allocate(tr_mat(1, 1))
+            tr_mat = 1
+            mask = (systems==1)
+
+            do ii=1, size(systems)
+                allocate(tmp(ubound(tr_mat, 1), ubound(tr_mat, 2)))
+                tmp = tr_mat
+                deallocate(tr_mat)
+
+                if(systems(ii)==0) then
+                    ! allocate space for result
+                    allocate(tr_mat(ubound(tmp, 1)*dims(ii), ubound(tmp, 2)*dims(ii)))
+                    ! create identity for the i-th system
+                    allocate(identity(dims(ii)**2))
+                    identity = 0
+                    identity(1::dims(ii)+1) = 1
+                    
+                    tr_mat = tensor_prod(tmp, reshape(identity, (/dims(ii), dims(ii)/)))
+                    deallocate(identity)
+
+                else
+                    mask(findloc(mask, .true.)) = .false.
+                    ! allocate space for result
+                    allocate(tr_mat(ubound(tmp, 1), ubound(tmp, 2)*dims(ii)))
+                    allocate(tmp_sys(1, dims(ii)))
+                    tmp_sys = 0
+                    tmp_sys(1, mod((el-1)/product(pack(dims, mask)), dims(ii))+1) = 1
+
+                    tr_mat = tensor_prod(tmp, tmp_sys)
+                    deallocate(tmp_sys)
+                end if
+
+                deallocate(tmp)
+            end do
+        end function
+
+
 end module
