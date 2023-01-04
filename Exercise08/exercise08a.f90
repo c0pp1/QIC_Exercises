@@ -266,7 +266,7 @@ program main
 contains
     
     subroutine print_help()
-        print *, "Usage: ./exercise07 -N [#subsystems] -l [inter. strength] -k [#eigenval to save to file] -o [output fname]"
+        print *, "Usage: ./exercise08a -N [#subsystems] -l [inter. strength] - [#iterations] -o [output fname]"
 
     end subroutine print_help
 

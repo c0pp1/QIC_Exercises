@@ -9,8 +9,8 @@ module IDMRG
 
         subroutine idmrg_step(H1, H2, H12, H23, H34)
             double complex   :: H1(:, :), H2(:, :), H12(:, :), H23(:, :), H34(:, :), &
-                                H_tmp(:, :), PDM(:, :), DM(:, :), id(ubound(H1, 1)*4, ubound(H1, 2)*4)
-            integer          :: id_vect((ubound(H1, 1)*4)**2), M, info
+                                H_tmp(:, :), PDM(:, :), DM(:, :), id(ubound(H1, 1), ubound(H1, 2))
+            integer          :: id_vect(ubound(H1, 1)**2), M, info
             double precision :: eigenvals1((ubound(H1, 1)*2)**2), eigenvals2((ubound(H1, 1)*2))
             intent(inout)    :: H1, H2, H12, H23, H34
             allocatable      :: PDM, DM, H_tmp
@@ -30,10 +30,7 @@ module IDMRG
             id = reshape(id_vect, shape(id))
 
             call checkpoint(5, 'Getting total Hamiltonian of the system...')
-            H_tmp = tensor_prod(H1, id) + tensor_prod(id, H1) + &
-                    tensor_prod(tensor_prod(id(:M,:M),H2), id(:M*2,:M*2)) + tensor_prod(id(:M*2,:M*2), tensor_prod(H2,id(:M,:M))) &
-                    + tensor_prod(H12, id(:M*2,:M*2)) + tensor_prod(id(:M*2,:M*2), H34) + &
-                    tensor_prod(tensor_prod(id(:M,:M), H23), id(:M,:M))
+            H_tmp = tot_hamiltonian(H1, H2, H12, H23, H34)
 
             call checkpoint(5, 'Getting groundstate...')
             call ev_wrap(JOBZ='V', A=H_tmp, W=eigenvals1, INFO=info)
@@ -41,9 +38,14 @@ module IDMRG
 
             call checkpoint(5, 'Getting DM...')
             call get_density_matrix(H_tmp(:,1), DM)
+            call checkpoint(5, 'DM size:', vector=real((/ubound(DM, 1), ubound(DM, 2)/), 8))
+            deallocate(H_tmp)
 
             call checkpoint(5, 'Getting partial DM...')
             call partial_trace(DM, (/0,0,1,1/), (/M, 2, 2, M/), PDM)
+            call checkpoint(5, 'partial DM size:', vector=real((/ubound(PDM, 1), ubound(PDM, 2)/), 8))
+            deallocate(DM)
+
             ! get projector
             call checkpoint(5, 'Getting projector...')
             call ev_wrap(JOBZ='V', A=PDM, W=eigenvals2, INFO=info)
@@ -53,13 +55,15 @@ module IDMRG
             ! get operators for next step
             call checkpoint(5, 'Projecting...')
             H1 = matmul(.Adj. PDM(:, M*2:M*2-M+1:-1), &
-                        matmul(tensor_prod(H1, id(:2, :2)) + tensor_prod(id(:M,:M), H2) + H12, &
+                        matmul(tensor_prod(H1, id(:2, :2)) + tensor_prod(id, H2) + H12, &
                                PDM(:, M*2:M*2-M+1:-1)))
             call checkpoint(5, 'H1 done')
+
             H12  = tensor_prod(matmul(.Adj. PDM(:, M*2:M*2-M+1:-1), &
                                       matmul(H12, PDM(:, M*2:M*2-M+1:-1))), &
                                cmplx(sigma_x, kind=8))
             call checkpoint(5, 'H12 done')
+
             H34  = tensor_prod(cmplx(sigma_x, kind=8), &
                                matmul(.Adj. PDM(:, M*2:M*2-M+1:-1), &
                                       matmul(H34, PDM(:, M*2:M*2-M+1:-1))))
@@ -68,7 +72,7 @@ module IDMRG
 
         subroutine idmrg_init(H1, H2, H12, H23, H34, N, int_op, lambda)
             double complex   :: H1(:, :), H2(:, :), H12(:, :), H23(:, :), H34(:, :)
-            integer          :: int_op(:, :), N, info, ii
+            integer          :: int_op(:, :), N, info
             double precision :: lambda
             allocatable      :: H1, H2, H12, H23, H34
             intent(in)       :: N, int_op, lambda
@@ -87,17 +91,36 @@ module IDMRG
             call get_Hamiltonian(N, lambda, H1, int_op)
 
             H2 = lambda*sigma_z
-
-            H12 = (0._8, 0._8)
-            H34 = (0._8, 0._8)
-            do ii=1, N
-                H12 = H12 + get_op_on_ijN(N+1, int_op, ii, ii+1)
-                H34 = H34 + get_op_on_ijN(N+1, int_op, ii, ii+1)
-            end do
+        
+            H12 = get_op_on_ijN(N+1, int_op, N, N+1)
+            H34 = get_op_on_ijN(N+1, int_op, 1, 2)
 
             H23 = get_op_on_ijN(2, int_op, 1, 2)
 
         end subroutine
+
+        function tot_hamiltonian(H1, H2, H12, H23, H34) result(H_tot)
+            double complex :: H1(:, :), H2(:, :), H12(:, :), H23(:, :), H34(:, :), H_tot(:, :), id(:, :)
+            integer        :: dim1, dim2, id_vect(:)
+            intent(in)     :: H1, H2, H12, H23, H34
+            allocatable    :: H_tot, id_vect, id
+
+            dim1 = ubound(H1, 1)
+            dim2 = ubound(H2, 1)
+
+            allocate(H_tot((dim1*dim2)**2, (dim1*dim2)**2), id(dim1*(dim2**2), dim1*(dim2**2)), id_vect((dim1*(dim2**2))**2))
+
+            id_vect = 0
+            id_vect(1::ubound(id, 1)+1) = 1
+            id = reshape(id_vect, shape(id))
+
+            H_tot = tensor_prod(H1, id) + tensor_prod(id, H1) + &
+                    tensor_prod(tensor_prod(id(:dim1,:dim1),H2), id(:dim1*dim2,:dim1*dim2)) + &
+                    tensor_prod(id(:dim1*dim2,:dim1*dim2), tensor_prod(H2,id(:dim1,:dim1))) + &
+                    tensor_prod(H12, id(:dim1*dim2,:dim1*dim2)) + tensor_prod(id(:dim1*dim2,:dim1*dim2), H34) + &
+                    tensor_prod(tensor_prod(id(:dim1,:dim1), H23), id(:dim1,:dim1))
+
+        end function tot_hamiltonian
 
 end module IDMRG
 
@@ -196,7 +219,6 @@ program main
     use checkpoint_mod
     use complex_matrix_ops
     use lapack_wrapper
-    use hamiltonian
     use IDMRG
     implicit none
 
@@ -269,7 +291,7 @@ program main
     call checkpoint(3, 'Expanding system... 100.00% done.')
 
     call checkpoint(4, 'Allocating space for eigenvals')
-    allocate(eigenvals(2**N), stat=info)
+    allocate(eigenvals(2**(N+1)**2), stat=info)
     if(info/=0) then
         call checkpoint(0, 'Failed to allocate space for eigenvals')
         stop 1
@@ -277,7 +299,7 @@ program main
         call checkpoint(4, 'Done!')
     end if
 
-    call ev_wrap(A=H1, W=eigenvals, INFO=info)
+    call ev_wrap(A=tot_hamiltonian(H1, H2, H12, H23, H34), W=eigenvals, INFO=info)
     if(info/=0) call checkpoint(1, 'Failed to get eigenvalues')
 
     ! save results to file, appending N, lambda, and ground state energy
@@ -296,7 +318,7 @@ program main
 contains
     
     subroutine print_help()
-        print *, "Usage: ./exercise08b -N [#subsystems] -l [inter. strength] -k [#eigenval to save to file] -o [output fname]"
+        print *, "Usage: ./exercise08b -N [#subsystems] -l [inter. strength] -i [#iterations] -o [output fname]"
 
     end subroutine print_help
 
