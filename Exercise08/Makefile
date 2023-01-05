@@ -11,7 +11,7 @@ libs=-llapack -lblas -ltmglib
 endif
 fftlibdir=/usr/local/lib
 includedir=/usr/local/include
-compileflags=-fbounds-check -O3
+compileflags=-fbounds-check -O3 -floop-parallelize-all
 
 all: exercise08a exercise08b
 	@echo "Done!"

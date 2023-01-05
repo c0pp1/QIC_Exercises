@@ -36,10 +36,10 @@ module RSRG
             id = reshape(id_vect, shape(HN))
 
             call checkpoint(5, 'Getting Hamiltonian of doubled system...')
-            H2N = tensor_prod(HN, id)       !< hamiltonian on left system
-            H2N = H2N + tensor_prod(id, HN) !< hamiltonian on right system
+            H2N = HN .tprod. id       !< hamiltonian on left system
+            H2N = H2N + id .tprod. HN !< hamiltonian on right system
 
-            H2N = H2N + tensor_prod(A, B)                  !< add interaction
+            H2N = H2N + A.tprod. B                  !< add interaction
 
             ! get projector
             call checkpoint(5, 'Getting projector...')
@@ -52,9 +52,9 @@ module RSRG
             call checkpoint(5, 'Projecting...')
             HN = matmul(.Adj. P(:, 1:M), matmul(H2N, P(:, 1:M))) / 2.
             call checkpoint(5, 'HN done')
-            A  = matmul(.Adj. P(:, 1:M), matmul(tensor_prod(id, A), P(:, 1:M))) / sqrt(2.)
+            A  = matmul(.Adj. P(:, 1:M), matmul(id .tprod. A, P(:, 1:M))) / sqrt(2.)
             call checkpoint(5, 'A done')
-            B  = matmul(.Adj. P(:, 1:M), matmul(tensor_prod(B, id), P(:, 1:M))) / sqrt(2.)
+            B  = matmul(.Adj. P(:, 1:M), matmul(B .tprod. id, P(:, 1:M))) / sqrt(2.)
             call checkpoint(5, 'B done')
         end subroutine
 
@@ -74,8 +74,8 @@ module RSRG
             id = reshape(id_vect, shape(id))
 
             ! get interaction terms
-            A = tensor_prod(id, int_op)
-            B = tensor_prod(int_op, id)
+            A = id .tprod. int_op
+            B = int_op .tprod. id
 
             call get_Hamiltonian(N, lambda, HN)
 
@@ -97,23 +97,34 @@ module hamiltonian
 
     contains
 
-    subroutine get_Hamiltonian(N, lambda, H)
-        integer :: N, ii, info
+    subroutine get_Hamiltonian(N, lambda, H, int_op)
+        integer :: N, ii, info, int_op(:, :), op(:,:)
         double complex, allocatable, intent(out) :: H(:, :)
         double precision :: lambda
-        intent(in) :: N, lambda
-    
-        call checkpoint(4, 'Allocating space for H')
-        allocate(H(2**N, 2**N), stat=info)
-        if(info/=0) then
-            call checkpoint(0, 'Failed to allocate space for H')
-            stop 1
+        intent(in) :: N, lambda, int_op
+        optional :: int_op
+        allocatable :: op
+
+        if(present(int_op)) then
+            op = int_op
         else
-            call checkpoint(4, 'Done!')
+            op = sigma_x
         end if
     
+        call checkpoint(4, 'Allocating space for H')
+        if(.not. allocated(H)) then 
+            allocate(H(2**N, 2**N), stat=info)
+            if(info/=0) then
+                call checkpoint(0, 'Failed to allocate space for H')
+                stop 1
+            else
+                call checkpoint(4, 'Done!')
+            end if
+        end if
+
         H = (0d0, 0d0)
-    
+
+
         ! self_int part
         do ii=1, N
             H = H + get_op_on_ijN(N, sigma_z, ii)
@@ -125,7 +136,7 @@ module hamiltonian
     
         ! nn_int part
         do ii=1, N-1
-            H = H - get_op_on_ijN(N, sigma_x, ii, ii+1)
+            H = H + get_op_on_ijN(N, op, ii, ii+1)
         end do
     
     end subroutine
@@ -146,17 +157,17 @@ module hamiltonian
         if(present(j)) then
             do ii=1, N
                 if(ii==i .or. ii==j) then
-                    op_ij = tensor_prod(op_ij, op)
+                    op_ij = op_ij .tprod. op
                 else
-                    op_ij = tensor_prod(op_ij, identity)
+                    op_ij = op_ij .tprod. identity
                 end if
             end do
         else
             do ii=1, N
                 if(ii==i) then
-                    op_ij = tensor_prod(op_ij, op)
+                    op_ij = op_ij .tprod. op
                 else
-                    op_ij = tensor_prod(op_ij, identity)
+                    op_ij = op_ij .tprod. identity
                 end if
             end do
         end if

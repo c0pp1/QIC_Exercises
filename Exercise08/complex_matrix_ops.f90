@@ -14,10 +14,10 @@ module complex_matrix_ops
         module procedure write_cmplx_2
     end interface write_cmplx
 
-    interface tensor_prod
+    interface operator(.tprod.)
         module procedure tensor_prod_int
         module procedure tensor_prod_dc
-    end interface tensor_prod
+    end interface
 
     contains
 
@@ -218,7 +218,7 @@ module complex_matrix_ops
                     identity = 0
                     identity(1::dims(ii)+1) = 1
                     
-                    tr_mat = tensor_prod(tmp, reshape(identity, (/dims(ii), dims(ii)/)))
+                    tr_mat = tmp .tprod. reshape(identity, (/dims(ii), dims(ii)/))
                     deallocate(identity)
 
                 else
@@ -229,7 +229,7 @@ module complex_matrix_ops
                     tmp_sys = 0
                     tmp_sys(1, mod((el-1)/product(pack(dims, mask)), dims(ii))+1) = 1
 
-                    tr_mat = tensor_prod(tmp, tmp_sys)
+                    tr_mat = tmp .tprod. tmp_sys
                     deallocate(tmp_sys)
                 end if
 
